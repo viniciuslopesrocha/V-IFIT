@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 826 330" width="220" height="80">
+  <!-- Leaf -->
+  <path d="M260 40 Q280 20 290 50 Q285 70 270 80 Q250 70 260 40" fill="#A8D5BA" stroke="none"/>
+  
+  <!-- V -->
+  <path d="M70 140 L120 260 L140 260 L190 140 L170 140 L130 220 L90 140 Z" fill="white" stroke="none"/>
+  
+  <!-- & -->
+  <path d="M220 140 Q210 155 220 170 Q230 185 245 180 Q255 175 255 165 Q255 150 245 145 Q235 140 220 140 M245 180 L260 260 L280 260 Q295 240 290 220 Q285 200 275 195" fill="white" stroke="none"/>
+  
+  <!-- I -->
+  <path d="M310 140 L330 140 L330 260 L310 260 Z" fill="white" stroke="none"/>
+  
+  <!-- Space and NUTRI FIT in green -->
+  <text x="360" y="240" font-family="Arial, sans-serif" font-size="80" font-weight="bold" fill="#A8D5BA">NUTRI FIT</text>
+  
+  <!-- Dumbbell -->
+  <g transform="translate(720 160)">
+    <!-- Left weight -->
+    <rect x="-30" y="-15" width="20" height="30" fill="#A8D5BA" rx="2"/>
+    <!-- Bar -->
+    <rect x="-10" y="-8" width="40" height="16" fill="#A8D5BA" rx="2"/>
+    <!-- Right weight -->
+    <rect x="30" y="-15" width="20" height="30" fill="#A8D5BA" rx="2"/>
+  </g>
+</svg>
