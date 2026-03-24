@@ -1,7 +1,7 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Check, Copy, CreditCard, MessageCircle, QrCode, Star, Sparkles, Target, Heart, Calendar } from "lucide-react";
+import { Check, Loader2, MessageCircle, Star, Sparkles, Target, Heart, Calendar } from "lucide-react";
 import heroFood from "@/assets/hero-food.jpg";
 
 const WHATSAPP_NUMERO = "5511973008088";
@@ -18,26 +18,59 @@ const stagger = {
   visible: { transition: { staggerChildren: 0.12 } },
 };
 
+const storageUserIdKey = "vf-calorie-user-id";
+
+const getOrCreateUserId = () => {
+  const saved = localStorage.getItem(storageUserIdKey);
+  if (saved) return saved;
+
+  const generated = crypto.randomUUID();
+  localStorage.setItem(storageUserIdKey, generated);
+  return generated;
+};
+
 const plans = [
   {
-    name: "Receitas Fit",
-    badge: "GRÁTIS",
-    price: "R$ 0",
-    description: "Acesso gratuito à nossa curadoria de receitas fit para começar sua jornada saudável hoje mesmo.",
-    features: ["9+ receitas exclusivas e selecionadas", "Filtro por categoria: café, almoço, jantar e mais", "Macros e calorias de cada receita", "Modo de preparo passo a passo", "Acesso imediato, sem cadastro"],
+    name: "Plano Smart",
+    badge: "ASSINATURA",
+    price: "R$ 39,90",
+    description: "Ideal para quem quer analisar refeicoes com controle mensal e previsibilidade.",
+    features: [
+      "20 analises por ciclo mensal",
+      "Leitura de calorias e macronutrientes",
+      "Checkout recorrente seguro",
+      "Acesso liberado automaticamente",
+    ],
     highlight: false,
-    free: true,
-    whatsappText: "",
+    plan: "limited" as const,
   },
   {
-    name: "Plano Premium",
+    name: "Plano Pro",
     badge: "MAIS POPULAR",
-    price: "R$ 149,90",
-    description: "Experiência premium com acompanhamento completo, personalizado e estratégico para seus resultados.",
-    features: ["Plano 100% personalizado para o seu corpo e rotina", "Plano alimentar adaptado ao seu nível de atividade física (sem achismo)", "Alimentação que cabe no seu bolso — sem comidas caras ou difíceis", "Fácil de seguir no dia a dia (sem estratégia impossível)", "Ajustes estratégicos conforme sua evolução", "Lista de compras simples e prática", "Estratégia pensada para rotina corrida", "Acompanhamento próximo"],
+    price: "R$ 59,90",
+    description: "Assinatura completa para uso ilimitado do fluxo de analise nutricional por IA.",
+    features: [
+      "Analises ilimitadas",
+      "Leitura completa de calorias e macros",
+      "Checkout recorrente seguro",
+      "Ativacao imediata apos confirmacao",
+    ],
     highlight: true,
-    free: false,
-    whatsappText: "Olá! Quero contratar o plano Premium da V&I Nutri Fit.",
+    plan: "unlimited" as const,
+  },
+  {
+    name: "Plano Acompanhamento",
+    badge: "NUTRICAO GUIADA",
+    price: "R$ 99,90",
+    description: "Plano alimentar personalizado com acompanhamento profissional continuo.",
+    features: [
+      "Plano alimentar personalizado",
+      "Ajustes de estrategia ao longo do acompanhamento",
+      "Pagamento unico",
+      "Fluxo de assinatura profissional e seguro",
+    ],
+    highlight: false,
+    plan: "coaching" as const,
   },
 ];
 
@@ -68,166 +101,38 @@ const benefits = [
 ];
 
 export default function DietaPersonalizadaSite() {
-  const [paginaObrigado, setPaginaObrigado] = React.useState(false);
+  const [search] = useSearchParams();
+  const [userId, setUserId] = React.useState("");
   const [formData, setFormData] = React.useState({ nome: "", email: "", mensagem: "" });
-  const [showPagamento, setShowPagamento] = React.useState(false);
-  const [pixCopied, setPixCopied] = React.useState(false);
-  const [showPedidoForm, setShowPedidoForm] = React.useState(false);
-  const [pedidoData, setPedidoData] = React.useState({ nome: "", email: "", telefone: "", objetivo: "" });
+  const [checkoutLoadingPlan, setCheckoutLoadingPlan] = React.useState<"limited" | "unlimited" | "coaching" | null>(null);
+  const [checkoutError, setCheckoutError] = React.useState("");
 
-  const handleClosePagamento = () => {
-    setShowPagamento(false);
-    setShowPedidoForm(false);
-  };
-  const handleCopyPix = async () => {
+  React.useEffect(() => {
+    setUserId(getOrCreateUserId());
+  }, []);
+
+  const onCheckout = async (plan: "limited" | "unlimited" | "coaching") => {
+    if (!userId) return;
+
+    setCheckoutLoadingPlan(plan);
+    setCheckoutError("");
+
     try {
-      await navigator.clipboard.writeText(pixKey);
-      setPixCopied(true);
-      setTimeout(() => setPixCopied(false), 1800);
-    } catch {
-      setPixCopied(false);
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, plan }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Nao foi possivel iniciar checkout");
+      if (!json.url) throw new Error("Checkout sem URL");
+      window.location.href = json.url;
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : "Falha no checkout");
+      setCheckoutLoadingPlan(null);
     }
   };
-  const pixKey = "4c6b16f4-c4dc-4bfb-88e3-4dc8aaebda47";
-  const mercadoPagoUrl = "https://mpago.li/1rvMnPR";
-
-  const handlePedidoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setPedidoData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handlePedidoPlanoSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const mensagem =
-      `Paguei pelo site!\n` +
-      `Nome: ${pedidoData.nome}\n` +
-      `Email: ${pedidoData.email}\n` +
-      `Telefone: ${pedidoData.telefone}\n` +
-      `Objetivo: ${pedidoData.objetivo}`;
-
-    window.open(getWhatsappUrl(mensagem), "_blank", "noopener,noreferrer");
-  };
-
-  const PagamentoModal = () => (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm" onClick={handleClosePagamento}>
-      <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-primary/20 bg-gradient-card p-6 shadow-card" onClick={(e) => e.stopPropagation()}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsla(var(--primary),0.18),transparent_48%)]" />
-        <button
-          onClick={handleClosePagamento}
-          className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full text-xl text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          aria-label="Fechar"
-        >
-          ×
-        </button>
-        <div className="relative z-10 mb-5 border-b border-border/60 pb-4 pr-8">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">Pagamento seguro</p>
-          <h2 className="font-display text-3xl font-bold leading-tight text-foreground">Escolha a forma de pagamento</h2>
-        </div>
-
-        <div className="relative z-10 mb-4 rounded-2xl border border-border/70 bg-secondary/70 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
-              <QrCode className="h-4 w-4" />
-            </span>
-            <h3 className="text-lg font-semibold text-foreground">PIX</h3>
-          </div>
-          <p className="mb-3 break-all rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-sm text-muted-foreground">{pixKey}</p>
-          <button
-            onClick={handleCopyPix}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/40 hover:bg-muted"
-          >
-            <Copy className="h-4 w-4" /> Copiar chave PIX
-          </button>
-          <span className={`ml-3 text-xs font-medium ${pixCopied ? "text-primary" : "text-muted-foreground"}`}>
-            {pixCopied ? "Chave copiada!" : "Copie e pague no app do seu banco"}
-          </span>
-        </div>
-
-        <div className="relative z-10 rounded-2xl border border-border/70 bg-secondary/70 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
-              <CreditCard className="h-4 w-4" />
-            </span>
-            <h3 className="text-lg font-semibold text-foreground">Cartão</h3>
-          </div>
-          <p className="mb-3 text-sm text-muted-foreground">Pagamento externo via Mercado Pago.</p>
-          <a
-            href={mercadoPagoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex rounded-full bg-gradient-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:scale-[1.02] hover:shadow-glow"
-          >
-            Pagar com cartão
-          </a>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setShowPedidoForm((prev) => !prev)}
-          className="relative z-10 mt-4 inline-flex w-full items-center justify-center rounded-full border border-primary/40 bg-primary/10 px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary/20"
-        >
-          Já peguei, pedir meu plano
-        </button>
-
-        {showPedidoForm && (
-          <form onSubmit={handlePedidoPlanoSubmit} className="relative z-10 mt-4 rounded-2xl border border-primary/30 bg-background/70 p-4">
-            <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-muted-foreground leading-relaxed">
-              <p className="mb-1 font-semibold text-primary text-[0.75rem]">Como funciona?</p>
-              <p>① Preencha os dados abaixo e envie pelo WhatsApp.</p>
-              <p>② Vou <span className="text-foreground font-medium">validar seu pagamento</span> manualmente.</p>
-              <p>③ Após a validação, você receberá um <span className="text-foreground font-medium">formulário detalhado</span> com perguntas para montarmos seu plano alimentar 100% personalizado.</p>
-            </div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-primary/80">Seus dados de contato</p>
-            <div className="space-y-3">
-              <input
-                type="text"
-                name="nome"
-                placeholder="Nome completo"
-                value={pedidoData.nome}
-                onChange={handlePedidoChange}
-                required
-                className="w-full rounded-xl border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              <input
-                type="email"
-                name="email"
-                placeholder="Seu melhor e-mail"
-                value={pedidoData.email}
-                onChange={handlePedidoChange}
-                required
-                className="w-full rounded-xl border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              <input
-                type="tel"
-                name="telefone"
-                placeholder="Telefone com DDD"
-                value={pedidoData.telefone}
-                onChange={handlePedidoChange}
-                required
-                className="w-full rounded-xl border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              <textarea
-                name="objetivo"
-                placeholder="Qual seu principal objetivo com o plano?"
-                value={pedidoData.objetivo}
-                onChange={handlePedidoChange}
-                rows={3}
-                required
-                className="w-full resize-none rounded-xl border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:scale-[1.02] hover:shadow-glow"
-            >
-              Enviar dados para WhatsApp
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -240,26 +145,18 @@ export default function DietaPersonalizadaSite() {
     window.location.href = getWhatsappUrl(mensagem);
   };
 
-  if (paginaObrigado) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-6">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass max-w-md rounded-2xl p-10 text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-            <Check className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="mb-3 font-display text-2xl font-bold text-foreground">Pagamento recebido 🎉</h1>
-          <p className="mb-6 text-muted-foreground">Agora envie o comprovante no WhatsApp para iniciarmos seu plano personalizado.</p>
-          <a href={getWhatsappUrl("Olá! Realizei o pagamento via PIX e gostaria de enviar o comprovante.")} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-6 py-3 font-semibold text-primary-foreground transition hover:scale-105">
-            <MessageCircle className="h-4 w-4" /> Enviar comprovante
-          </a>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background font-body">
-      {showPagamento && PagamentoModal()}
+      {search.get("checkout") === "success" && (
+        <div className="mx-auto mt-24 w-full max-w-6xl rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          Assinatura confirmada. O acesso sera liberado automaticamente apos confirmacao do pagamento.
+        </div>
+      )}
+      {search.get("checkout") === "cancel" && (
+        <div className="mx-auto mt-24 w-full max-w-6xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          Checkout cancelado. Quando quiser, voce pode retomar sua assinatura com um clique.
+        </div>
+      )}
 
       {/* Floating WhatsApp */}
       <a href={getWhatsappUrl("Olá! Preciso de suporte da V&I Nutri Fit.")} target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary shadow-glow transition hover:scale-110">
@@ -276,6 +173,7 @@ export default function DietaPersonalizadaSite() {
             <a href="#resultados" className="transition hover:text-primary">Resultados</a>
             <a href="#suporte" className="transition hover:text-primary">Suporte</a>
             <Link to="/receitas" className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary/20">🥗 Receitas Fit</Link>
+            <Link to="/calorias" className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent transition hover:bg-accent/20">📸 Caloria IA</Link>
           </div>
           <a href="#planos" className="rounded-full bg-gradient-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:scale-105">
             Começar agora
@@ -309,6 +207,9 @@ export default function DietaPersonalizadaSite() {
               <a href="#planos" className="rounded-full bg-gradient-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:scale-105 hover:shadow-glow md:px-7 md:py-3.5 md:text-base">
                 Começar agora
               </a>
+              <Link to="/calorias" className="rounded-full border border-primary/40 bg-primary/10 px-6 py-3 text-sm font-semibold text-primary transition hover:scale-105 hover:bg-primary/20 md:px-7 md:py-3.5 md:text-base">
+                Testar Caloria IA
+              </Link>
               <a href={getWhatsappUrl("Olá! Preciso de suporte da V&I Nutri Fit.")} target="_blank" rel="noopener noreferrer" className="rounded-full border border-border bg-secondary px-6 py-3 text-sm font-semibold text-secondary-foreground transition hover:bg-muted md:px-7 md:py-3.5 md:text-base">
                 Falar com suporte
               </a>
@@ -355,9 +256,14 @@ export default function DietaPersonalizadaSite() {
         <div className="mx-auto max-w-6xl">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger} className="mb-14 text-center">
             <motion.h2 variants={fadeUp} className="mb-3 font-display text-3xl font-bold text-foreground md:text-4xl">Escolha seu Plano</motion.h2>
-            <motion.p variants={fadeUp} className="text-muted-foreground">Comece grátis ou acelere seus resultados com o plano completo</motion.p>
+            <motion.p variants={fadeUp} className="text-muted-foreground">Temos 3 planos: Smart (R$ 39,90), Pro (R$ 59,90) e Acompanhamento Alimentar (R$ 99,90)</motion.p>
           </motion.div>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger} className="grid gap-6 md:grid-cols-2 max-w-3xl mx-auto">
+          {checkoutError && (
+            <div className="mx-auto mb-6 max-w-3xl rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              {checkoutError}
+            </div>
+          )}
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger} className="grid gap-6 md:grid-cols-3 mx-auto">
             {plans.map((plan) => (
               <motion.div key={plan.name} variants={fadeUp} className={`relative flex flex-col rounded-2xl border p-8 transition ${plan.highlight ? "border-primary/40 bg-gradient-card shadow-glow" : "border-border bg-card"}`}>
                 {plan.badge && (
@@ -370,18 +276,10 @@ export default function DietaPersonalizadaSite() {
                 <h3 className="mb-2 font-display text-xl font-bold text-foreground">{plan.name}</h3>
                 <p className="mb-5 text-sm text-muted-foreground">{plan.description}</p>
                 <div className="mb-5">
-                  {plan.highlight ? (
-                    <>
-                      <span className="mr-2 text-lg text-muted-foreground line-through">R$ 257,90</span>
-                      <span className="text-4xl font-bold text-foreground">{plan.price}</span>
-                      <p className="mt-1 text-xs text-muted-foreground">Via PIX ou cartão (até 6x)</p>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-4xl font-bold text-primary">{plan.price}</span>
-                      <p className="mt-1 text-xs text-muted-foreground">Sem cartão, sem cadastro</p>
-                    </>
-                  )}
+                  <span className={`text-4xl font-bold ${plan.highlight ? "text-foreground" : "text-primary"}`}>{plan.price}</span>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {plan.plan === "coaching" ? "pagamento unico" : "por mes, assinatura recorrente"}
+                  </p>
                 </div>
                 <ul className="mb-8 flex-1 space-y-3">
                   {plan.features.map((f) => (
@@ -390,21 +288,19 @@ export default function DietaPersonalizadaSite() {
                     </li>
                   ))}
                 </ul>
-                {plan.free ? (
-                  <Link
-                    to="/receitas"
-                    className="block w-full rounded-full border border-primary/40 bg-primary/10 py-3 text-center text-sm font-semibold text-primary transition hover:scale-[1.02] hover:bg-primary/20"
-                  >
-                    Acessar receitas grátis
-                  </Link>
-                ) : (
-                  <button
-                    className="block w-full rounded-full bg-gradient-primary py-3 text-center text-sm font-semibold text-primary-foreground shadow-glow transition hover:scale-[1.02]"
-                    onClick={() => setShowPagamento(true)}
-                  >
-                    Contratar agora
-                  </button>
-                )}
+                <button
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-primary py-3 text-center text-sm font-semibold text-primary-foreground shadow-glow transition hover:scale-[1.02] disabled:opacity-60"
+                  onClick={() => void onCheckout(plan.plan)}
+                  disabled={checkoutLoadingPlan !== null}
+                >
+                  {checkoutLoadingPlan === plan.plan ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Abrindo checkout...
+                    </>
+                  ) : (
+                    "Assinar"
+                  )}
+                </button>
               </motion.div>
             ))}
           </motion.div>
